@@ -13,11 +13,11 @@ This project brings Sinilink / bench power supplies to ESPHome (and therefore Ho
 Connect the PSU UART directly to your ESP (I used an ESP32-C3):
 
 * **5V** from the PSU → ESP 5V (or VIN, depending on board)
-* **GND** → ESP GND
 * **TX (PSU)** → **RX (ESP)**
 * **RX (PSU)** → **TX (ESP)**
-Pinout is: **5V, TX, RX, GND**.
+* **GND** → ESP GND
 
+Pinout of the header is: **5V, TX, RX, GND**.
 5V is usualy marked on the PSU Board. I could not find a matching connector so I soldered it directly onto the board.
 
 ## ESPHome configuration
