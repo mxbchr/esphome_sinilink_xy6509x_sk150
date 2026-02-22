@@ -34,7 +34,7 @@ substitutions:
   xy6509x_sovp: "67"
   xy6509x_socp: "9.2"
   xy6509x_sopp: "650"
-  ############### Documentation for XY6509X here: https://www.mikrocontroller.net/attachment/641206/Powermodule_XY-SK60_Mosbus_protocol_english.pdf
+  ############### Documentation for similar XY-SK60 here: https://www.mikrocontroller.net/attachment/641206/Powermodule_XY-SK60_Mosbus_protocol_english.pdf
 
   ##############
   ### SK150 ####
