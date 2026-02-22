@@ -17,8 +17,8 @@ Connect the PSU UART header directly to your ESP (I used an ESP32-C3):
 * **TX (PSU)** → **RX (ESP)**
 * **RX (PSU)** → **TX (ESP)**
 Pinout is: **5V, TX, RX, GND**.
+
 5V is usualy marked on the PSU Board. I could not find a matching connector so I soldered it directly onto the board.
-Important notes:
 
 ## ESPHome configuration
 
@@ -51,7 +51,8 @@ After pairing the device with Home Assistant via the ESPHome integration, you’
 
 2. Controls / Memory groups (M0–M9) editing
    Adds convenient editing of the PSU’s memory groups.
-   Those are the settings you’d normally reach via the PSU’s “I-SET"-Button long press menu. 
+   Those are the settings you’d normally reach via the PSU’s “I-SET"-Button long press menu.
+   
    In Home Assistant:
 
 * Select which memory group you want to edit using **“Memory group to edit”** (M0…M9)
