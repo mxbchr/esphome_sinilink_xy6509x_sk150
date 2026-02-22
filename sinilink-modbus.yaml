@@ -1,99 +1,163 @@
 substitutions:
-  # Change this model to fit your particular one.
-  # You can find it in Home Assistant as the device diagnostic "Model Name".
-  model: "XY6509X" #"XY5008"
-  device_name: "${model}-controller"
+
+  ### Change this model to fit your particular one.
+  ### i.e.: "xy6509x"; "sk150"
+  model: "xy6509x" 
+
+###############################
+########## cut here ###########
+###############################
+
+  devicename: "sinilink-${model}"
   device_friendly_name: "sinilink-${model}"
   device_description: "Power Supply"
+  update_interval: "1s"
   
-  # Model specific settings (Don't change these!)
-  # XY5008
-  XY5008_voltage_maximum: "50"
-  XY5008_voltage_accuracy: "2"
-  XY5008_voltage_multiplier: "0.01"
-  XY5008_current_maximum: "8"
-  XY5008_current_accuracy: "3"
-  XY5008_current_multiplier: "0.001"
-  # XY6509X
-  XY6509X_voltage_maximum: "65"
-  XY6509X_voltage_accuracy: "2"
-  XY6509X_voltage_multiplier: "0.01"
-  XY6509X_current_maximum: "9"
-  XY6509X_current_accuracy: "3"
-  XY6509X_current_multiplier: "0.001"
-  XY6509X_current_maximum: "585"
-  # Documentation for XY6509X here: https://www.mikrocontroller.net/attachment/641206/Powermodule_XY-SK60_Mosbus_protocol_english.pdf
-  
+  ######### Model specific settings ########
 
-globals:
-   - id:   vin_undervoltage_theshold
-     type: float
-     restore_value: no
-     initial_value: '17'
-  
+  ################
+  ### XY6509X ####
+  ################
+  xy6509x_voltage_maximum: "65"
+  xy6509x_voltage_accuracy: "2"
+  xy6509x_voltage_multiplier: "0.01"
+  xy6509x_current_maximum: "9.1"
+  xy6509x_current_accuracy: "3"
+  xy6509x_current_multiplier: "0.001"
+  xy6509x_power_multiplier: "0.01"
+  xy6509x_power_maximum: "585"
+  xy6509x_power_accuracy: "3"
+  xy6509x_temp_multiplier: "0.1"
+  xy6509x_temp_accuracy: "1"
+  xy6509x_slvp_l: "10"
+  xy6509x_slvp_h: "75"
+  xy6509x_sovp: "67"
+  xy6509x_socp: "9.2"
+  xy6509x_sopp: "650"
+  ############### Documentation for XY6509X here: https://www.mikrocontroller.net/attachment/641206/Powermodule_XY-SK60_Mosbus_protocol_english.pdf
+
+  ##############
+  ### SK150 ####
+  ##############
+  sk150_voltage_maximum: "36.5"
+  sk150_voltage_accuracy: "2"
+  sk150_voltage_multiplier: "0.01"
+  sk150_current_maximum: "7.1"
+  sk150_current_accuracy: "3"
+  sk150_current_multiplier: "0.001"
+  sk150_power_multiplier: "0.01"
+  sk150_power_maximum: "150"
+  sk150_power_accuracy: "3"
+  sk150_temp_multiplier: "0.1"
+  sk150_temp_accuracy: "1"
+  sk150_slvp_l: "5.5"
+  sk150_slvp_h: "38"
+  sk150_sovp: "38"
+  sk150_socp: "7.2"
+  sk150_sopp: "180"
+
 esphome:
-  name: $device_name
-  friendly_name: $device_friendly_name
-  comment: $device_description
+
+  name: ${devicename}
+  friendly_name: ${device_friendly_name}
+  comment: ${device_description}
   name_add_mac_suffix: false
   project:
-    name: "sinilink.${devicename}"
-    version: "1.0.0"
+    name: sinilink.${devicename}
+    version: "2.0.1"
+  platformio_options:
+    board_build.mcu: esp32c3
+    board_build.variant: esp32c3  
+    board_build.flash_mode: dio     
 
-esp8266:
-  board: esp01_1m
+esp32:
 
-# Enable logging
+  variant: ESP32C3
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+#    sdkconfig_options: 
+
 logger:
-  level: INFO
-  # Disable logging via UART, since we're using this for modbus communication
-  baud_rate: 0
 
-# Enable status LED
-status_led:
-  pin:
-    number: GPIO2
-    inverted: true
+  level: DEBUG
+  hardware_uart: USB_SERIAL_JTAG
+  #baud_rate: 0
 
-web_server:
-  port: 80
-  local: true
-  log: false
-
-# Enable Home Assistant API
 api:
-#  encryption:
-#    key: !secret home_assistant_key
-  reboot_timeout: 0s
-  
+
+  encryption:
+    key: "XXXXXXX="
+
 ota:
-  password: ""
 
-# Configure WiFi
+  platform: esphome
+  password: !secret ota_password
+
 wifi:
-  networks:
-  - ssid: !secret wifi_ssid1
-    password: !secret wifi_password1
-  - ssid: !secret wifi_ssid2
-    password: !secret wifi_password2
-    
 
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+  output_power: 8.5dB #important!
   ap:
-    ssid: "${devicename} Fallback Hotspot"
-    password: ""
+    ssid: ${devicename} AP
+    password: !secret ap_password
+    ap_timeout: 1min
+
+captive_portal:
+
+uart:
+
+  id: mod_bus
+  tx_pin: 21
+  rx_pin: 20
+  baud_rate: 115200
+  data_bits: 8
+  stop_bits: 1
+  parity: none
+
+modbus:
+
+ id: modbus1
+ uart_id: mod_bus
+
+modbus_controller:
+
+  - id: powersupply
+    address: 0x01
+    modbus_id: modbus1
+    setup_priority: 600
+    update_interval: ${update_interval}
+    command_throttle: 50ms
+    allow_duplicate_commands: true
+
+globals:
+
+  - id: mem_edit_group
+    type: int
+    restore_value: yes
+    initial_value: '0'
 
 text_sensor:
+
   - platform: wifi_info
+    ssid:
+      name: Connected SSID ${devicename} 
+      entity_category: diagnostic
+    bssid:
+      name: Connected BSSID ${devicename}
+      entity_category: diagnostic
+    mac_address:
+      name: Mac Wifi Address ${devicename} 
+      entity_category: diagnostic
     ip_address:
-      name: ESP IP Address
+      name: IP Address ${devicename} 
+      entity_category: diagnostic
       id: ip_address
-      on_value:      
-        then:
-          - lambda: |-
-          
+        
   - platform: template
-    name: "Turn On Time"
+    name: "Output Time"
     lambda: |-
       char buffer[16];
       std::string ton_time;
@@ -101,112 +165,187 @@ text_sensor:
       ton_time = buffer;
       
       return {ton_time};
-    update_interval: 1s
+    update_interval: ${update_interval}
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    name: "Protection Status"
-    id: "PROTECT"
-    address: 16
-    register_type: holding
-    value_type: U_WORD
-    bitmask: 0x1
-    #entity_category: config
-    filters:
-      - map:
-        - 0 -> Normal
-        - 1 -> OVP over voltage protection
-        - 2 -> OCP over current protection
-        - 3 -> OPP output over power protection
-        - 4 -> LVP input undervoltage protection
-        - 5 -> OAH over capacity protection
-        - 6 -> OHP overtime protection
-        - 7 -> OTP over termperature protection
-        - 8 -> OEP no output protection
-        - 9 -> OWH over energy protection
-        - 10 -> ICP over input current protection
-        - 11 -> ETP external temperature protection
-
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    address: 22
     name: "Model"
     id: "MODEL"
+    address: 22
     register_type: holding
-    value_type: U_WORD
-    #internal: true
+    response_size: 2
+    raw_encode: ANSI
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    address: 23
-    name: "Firmware"
+  - platform: template
+    name: "Firmware PSU"
     id: "VERSION"
-    register_type: holding
-    value_type: U_WORD
-    #internal: true
+    lambda: |-
+      int v = (int) id(fw_raw).state;   // e.g. 136
+      int major = v / 100;
+      int minor = (v / 10) % 10;
+      int patch = v % 10;
+      char buf[10];
+      snprintf(buf, sizeof(buf), "%d.%d.%d", major, minor, patch);
+      return std::string(buf);
+    update_interval: ${update_interval}
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    address: 48
+  - platform: template
+    name: "Protection Status"
+    id: "PROTECT"
+    lambda: |-
+      int v = (int) id(protect_code).state;
+      switch (v) {
+        case 0: return std::string("Normal");
+        case 1: return std::string("OVP over voltage protection");
+        case 2: return std::string("OCP over current protection");
+        case 3: return std::string("OPP over power protection");
+        case 4: return std::string("LVP input undervoltage protection");
+        case 5: return std::string("OAH over capacity protection");
+        case 6: return std::string("OHP overtime protection");
+        case 7: return std::string("OTP over temperature protection");
+        case 8: return std::string("OEP no output protection");
+        case 9: return std::string("OWH over energy protection");
+        case 10: return std::string("ICP over input current protection");
+        case 11: return std::string("ETP external temperature protection");
+        default: return std::string("Unknown: ") + to_string(v);
+      }
+    update_interval: ${update_interval}
+
+  - platform: template
     name: "Host Type"
     id: "MASTER"
-    register_type: holding
-    value_type: U_WORD
-    #internal: true
-    filters:
-      - map:
-        - 0x3B3A -> WiFi
-        
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    address: 49
+    lambda: |-
+      int v = (int) id(master_code).state;
+      if (v == 0x3B3A) return std::string("WiFi");
+      return std::string("Unknown: ") + to_string(v);
+    update_interval: ${update_interval}
+
+  - platform: template
     name: "Wifi Configuration"
-    id: "WIFI-CONFIG"
-    register_type: holding
-    value_type: U_WORD
-    #internal: true
-    filters:
-      - map:
-        - 0 -> Invalid 
-        - 1 -> Station Mode
-        - 2 -> AP Mode
-  
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    address: 50
+    id: "WIFI_CONFIG"
+    lambda: |-
+      int v = (int) id(wifi_config_code).state;
+      if (v == 0) return std::string("Invalid");
+      if (v == 1) return std::string("Touch pairing / Station Mode");
+      if (v == 2) return std::string("Valid");
+      return std::string("Unknown: ") + to_string(v);
+    update_interval: ${update_interval}
+
+  - platform: template
     name: "Wifi Status"
-    id: "WIFI-STATUS"
-    register_type: holding
-    value_type: U_WORD
-    #internal: true
-    filters:
-      - map:
-        - 0 -> Invalid Network
-        - 1 -> Station Connectec
-        - 2 -> AP Connected
-        - 3 -> Station Connecting...
-        - 4 -> AP Connecting...
+    id: "WIFI_STATUS"
+    lambda: |-
+      int v = (int) id(wifi_status_code).state;
+      if (v == 0) return std::string("Invalid network");
+      if (v == 1) return std::string("Connected to router");
+      if (v == 2) return std::string("Connected to server");
+      if (v == 3) return std::string("Touch configuration");
+      if (v == 4) return std::string("Connected");
+      return std::string("Unknown: ") + to_string(v);
+    update_interval: ${update_interval}
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    address: 51
-    name: "IP4 First Two bytes"
-    id: "IP4-H"
-    register_type: holding
-    value_type: U_WORD
-    #internal: true
+  - platform: template
+    name: "IPv4"
+    id: "IP4"
+    lambda: |-
+      uint16_t h = (uint16_t) id(ipv4_h_word).state;
+      uint16_t l = (uint16_t) id(ipv4_l_word).state;
+      uint8_t a = (h >> 8) & 0xFF;
+      uint8_t b = (h >> 0) & 0xFF;
+      uint8_t c = (l >> 8) & 0xFF;
+      uint8_t d = (l >> 0) & 0xFF;
+      char buf[16];
+      snprintf(buf, sizeof(buf), "%u.%u.%u.%u", a,b,c,d);
+      return std::string(buf);
+    update_interval: ${update_interval}
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    address: 52
-    name: "IP4 Last Two bytes"
-    id: "IP4-L"
-    register_type: holding
-    value_type: U_WORD
-    #internal: true
+script:
+  - id: mem_refresh_group
+    mode: restart
+    then:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+
+          // group base = 0x0050 + group*0x0010  (see PDF note)  :contentReference[oaicite:3]{index=3}
+          const uint16_t base = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010;
+          const uint16_t reg_count = 15;  // 0x0050..0x005E => 15 regs (V-SET..S-ETP) :contentReference[oaicite:4]{index=4}
+          const uint8_t expected_bytes = reg_count * 2;
+
+          auto *vset = id(V_SET_2);
+          auto *iset = id(I_SET_2);
+          auto *slvp = id(S_LVP);
+          auto *sovp = id(S_OVP);
+          auto *socp = id(S_OCP);
+          auto *sopp = id(S_OPP);
+          auto *sohp_h = id(S_OHP_H);
+          auto *sohp_m = id(S_OHP_M);
+          auto *soah = id(S_OHA);
+          auto *sowh = id(S_OWH);
+          auto *sotp = id(S_OTP);
+          auto *sinisw = id(S_INI);
+          auto *setp = id(S_ETP);
+
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_read_command(
+              ctl,
+              esphome::modbus_controller::ModbusRegisterType::HOLDING,
+              base,
+              reg_count,
+              [=](esphome::modbus_controller::ModbusRegisterType, uint16_t start_address, const std::vector<uint8_t> &data) {
+                // ESPHome passes "data" as a byte vector; depending on internals it may include a byte-count.
+                // Find the byte-count (= reg_count*2) within the first few bytes and decode from there.
+                size_t off = 0;
+                bool found = false;
+                for (size_t i = 0; i < 4 && i < data.size(); i++) {
+                  if (data[i] == expected_bytes && (i + 1 + expected_bytes) <= data.size()) {
+                    off = i + 1;
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found && data.size() >= expected_bytes) {
+                  off = 0;  // assume pure payload
+                  found = true;
+                }
+                if (!found || (off + expected_bytes) > data.size()) {
+                  ESP_LOGW("memgrp", "Bad response for base=0x%04X len=%u", start_address, (unsigned) data.size());
+                  return;
+                }
+
+                uint16_t r[reg_count];
+                for (int i = 0; i < reg_count; i++) {
+                  r[i] = (uint16_t(data[off + i * 2]) << 8) | uint16_t(data[off + i * 2 + 1]);
+                }
+
+                // Map according to the PDF table (M0 block shows scaling / decimals). :contentReference[oaicite:5]{index=5}
+                vset->publish_state((float) r[0] * 0.01f);
+                iset->publish_state((float) r[1] / 1000.0f);
+                slvp->publish_state((float) r[2] * 0.01f);
+                sovp->publish_state((float) r[3] * 0.01f);
+                socp->publish_state((float) r[4] / 1000.0f);
+                sopp->publish_state((float) r[5] * 0.1f);    // S-OPP has 1 decimal in the table :contentReference[oaicite:6]{index=6}
+                sohp_h->publish_state((float) r[6]);
+                sohp_m->publish_state((float) r[7]);
+
+                uint32_t oah = (uint32_t(r[9]) << 16) | r[8];   // low@88 high@89 :contentReference[oaicite:7]{index=7}
+                soah->publish_state((float) (oah / 1000.0f));
+
+                uint32_t owh = (uint32_t(r[11]) << 16) | r[10]; // low@90 high@91 :contentReference[oaicite:8]{index=8}
+                sowh->publish_state(owh * 0.01f);               // table says "10mWh" => 0.01Wh :contentReference[oaicite:9]{index=9}
+
+                sotp->publish_state(r[12]);
+                sinisw->publish_state((r[13] & 0x0001) != 0);
+                setp->publish_state(r[14]);
+              }
+          );
+
+          ctl->queue_command(cmd);
 
 interval:
-  - interval: 5s
+  - interval: ${update_interval}
+    then:
+      - script.execute: mem_refresh_group
+
+  - interval: ${update_interval}
     then:
       - lambda: |-
           char ip[18];
@@ -235,85 +374,13 @@ interval:
               }
             }
           }
-          
-  - interval: 1s
-    then:
-      - lambda: |-
-          esphome::modbus_controller::ModbusController *controller = id(powersupply);
-          esphome::modbus_controller::ModbusCommandItem set_wifi_command =
-              esphome::modbus_controller::ModbusCommandItem::create_read_command(controller, esphome::modbus_controller::ModbusRegisterType::HOLDING, 0x30, 5);
-          // Submit the command to the send queue
-          powersupply->queue_command(set_wifi_command);
-          
-  - interval: 0.5s
-    then:
-      - lambda: |-
-          static int count = 0;
-          static int delay_count = 0;
-          static int uv_count = 0;
-                    
-          if ((id(output_switch).state) && (id(cutoff_current).state!=0) && (id(IOUT).state < id(cutoff_current).state)){
-            if (count>=5) {
-              count = 0;
-              id(output_switch).turn_off();
-              id(out_relay).turn_off();
-            }
-            else count++;              
-          }
-          else count=0;
-          
-          if (id(UIN).state < id(vin_undervoltage_theshold)) { if (uv_count<4) uv_count++; }
-          else {
-             if (id(output_switch).state) id(out_relay).turn_on();
-             uv_count=0;
-          }
-             
-          if (uv_count >=4) {
-              id(out_relay).turn_off();
-          }    
-          
-          if (id(out_relay).state) {
-              if (id(output_switch).state) delay_count=0;
-              else delay_count++;
-          }
-          else delay_count=0;
-          
-          if (delay_count>=120*3) { 
-              id(out_relay).turn_off();
-              delay_count=0;
-          }    
-          
-captive_portal:
-
-uart:
-  id: mod_bus
-  tx_pin: GPIO1
-  rx_pin: GPIO3
-  baud_rate: 115200
-  data_bits: 8
-  stop_bits: 1
-  parity: none
-
-modbus:
- id: modbus1
-# send_wait_time: 1ms
-
-modbus_controller:
-  - id: powersupply
-    ## This address should be set to the "Address" value in the config menu
-    address: 0x01
-    modbus_id: modbus1
-    setup_priority: 600
-    update_interval: 1s
-    command_throttle: 1ms
-    
 
 sensor:
-  
+
   - platform: modbus_controller
     modbus_controller_id: powersupply
     address: 2
-    name: "Output voltage"
+    name: "VOUT Output voltage"
     id: "VOUT" # Output voltage display value
     device_class: voltage
     state_class: measurement
@@ -327,7 +394,7 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: powersupply
     address: 3
-    name: "Output current"
+    name: "IOUT Output current"
     id: "IOUT" # Output current display value
     device_class: current
     state_class: measurement
@@ -348,84 +415,48 @@ sensor:
     unit_of_measurement: "W"
     register_type: holding
     value_type: U_WORD
-    accuracy_decimals: 2
+    accuracy_decimals: ${${model}_power_accuracy}
     filters:
-      - multiply: 0.01
+      - multiply: ${${model}_power_multiplier}
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
     address: 5
-    name: "Input voltage"
-    id: "UIN" # Input voltage display value
+    name: "VIN Input voltage"
+    id: "VIN" # Input voltage display value
     device_class: voltage
     unit_of_measurement: "V"
     register_type: holding
     value_type: U_WORD
     accuracy_decimals: ${${model}_voltage_accuracy}
-    #accuracy_decimals: 3
     filters:
       - multiply: ${${model}_voltage_multiplier}
-    #  - multiply: 0.01
   
   - platform: modbus_controller
     modbus_controller_id: powersupply
+    name: "Output Ah" #total ah output
+    id: "AH"
     address: 6
-    name: "unknown-AH-LOW" #"Battery charge"
-    id: "AH-LOW" # Output AH Low 16-bit output
-    #device_class: "energy_storage"
+    register_type: holding
+    value_type: U_DWORD_R   # low word first: 6=low, 7=high
     state_class: measurement
     unit_of_measurement: "Ah"
-    #icon: "mdi:battery-60"
-    register_type: holding
-    value_type: U_DWORD_R
-    #accuracy_decimals: 3
-    #filters:
-    #  - multiply: 0.001
+    accuracy_decimals: ${${model}_power_accuracy}
+    filters:
+      - multiply: ${${model}_power_multiplier}
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    address: 7
-    name: "unknown-AH-HIGH" #"Battery charge"
-    id: "AH-HIGH" # AH High 16-bit output
-    #device_class: "energy_storage"
-    state_class: measurement
-    unit_of_measurement: "Ah"
-    #icon: "mdi:battery-60"
-    register_type: holding
-    value_type: U_DWORD_R
-    #accuracy_decimals: 3
-    #filters:
-    #  - multiply: 0.001
-
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
+    name: "Output Wh" # total wh output
+    id: "WH"
     address: 8
-    name: "unknown-WH-LOW" #"Battery charge"
-    id: "WH-LOW" # WH Low 16-bit output
-    #device_class: "energy_storage"
+    register_type: holding
+    value_type: U_DWORD_R   # 8=low, 9=high
+    accuracy_decimals: ${${model}_power_accuracy}
     state_class: measurement
     unit_of_measurement: "Wh"
-    #icon: "mdi:battery-60"
-    register_type: holding
-    value_type: U_DWORD_R
-    #accuracy_decimals: 3
-    #filters:
-    #  - multiply: 0.001
-
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    address: 9
-    name: "unknown-WH-HIGH" #"Battery charge"
-    id: "WH-HIGH" # WH High 16-bit output
-    #device_class: "energy_storage"
-    state_class: measurement
-    unit_of_measurement: "Wh"
-    #icon: "mdi:battery-60"
-    register_type: holding
-    value_type: U_DWORD_R
-    #accuracy_decimals: 3
-    #filters:
-    #  - multiply: 0.001
+    filters:
+      - multiply: ${${model}_power_multiplier}
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
@@ -435,7 +466,7 @@ sensor:
     unit_of_measurement: "hours"
     register_type: holding
     value_type: U_WORD
-    #internal: true
+    internal: true
   
   - platform: modbus_controller
     modbus_controller_id: powersupply
@@ -445,7 +476,7 @@ sensor:
     unit_of_measurement: "minutes"
     register_type: holding
     value_type: U_WORD
-    #internal: true
+    internal: true
   
   - platform: modbus_controller
     modbus_controller_id: powersupply
@@ -455,10 +486,10 @@ sensor:
     unit_of_measurement: "seconds"
     register_type: holding
     value_type: U_WORD
-    #internal: true
+    internal: true
     
   - platform: modbus_controller
-    name: "System Temperature"
+    name: "T_IN System Temperature"
     id: "T_IN" 
     device_class: temperature
     state_class: measurement
@@ -467,12 +498,13 @@ sensor:
     address: 13
     value_type: S_WORD
     unit_of_measurement: "°C" # "°F"
-    accuracy_decimals: 1
+    accuracy_decimals: ${${model}_temp_accuracy}
+#    force_new_range: true
     filters:
-      - multiply: 0.1
+      - multiply: ${${model}_temp_multiplier}
     
   - platform: modbus_controller
-    name: "External Temperature"
+    name: "T_EX External Temperature"
     id: "T_EX"
     state_class: measurement
     modbus_controller_id: powersupply
@@ -481,25 +513,86 @@ sensor:
     value_type: S_WORD
     device_class: temperature
     unit_of_measurement: "°C" # "°F"
-    accuracy_decimals: 1
+    accuracy_decimals: ${${model}_temp_accuracy}
     filters:
-      - multiply: 0.1
-      
-#  - platform: modbus_controller
-#    name: "Host type"
-#    state_class: measurement
-#    modbus_controller_id: powersupply
-#    register_type: holding
-#    address: 48
-#    value_type: U_WORD
-    #internal: true
-       
+      - filter_out: 8888   # raw "not connected" marker
+      - multiply: ${${model}_temp_multiplier}
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    id: "protect_code"
+    address: 16
+    register_type: holding
+    value_type: U_WORD
+    internal: true
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    id: "fw_raw"
+    address: 23
+    register_type: holding
+    value_type: U_WORD
+    internal: true
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    id: "master_code"
+    address: 48
+    register_type: holding
+    value_type: U_WORD
+    internal: true
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    id: "wifi_config_code"
+    address: 49
+    register_type: holding
+    value_type: U_WORD
+    internal: true
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    id: "wifi_status_code"
+    address: 50
+    register_type: holding
+    value_type: U_WORD
+    internal: true
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    id: "ipv4_h_word"
+    address: 51
+    register_type: holding
+    value_type: U_WORD
+    internal: true
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    id: "ipv4_l_word"
+    address: 52
+    register_type: holding
+    value_type: U_WORD
+    internal: true
+
+  - platform: uptime
+    name: Uptime ${devicename}
+    update_interval: 60s
+    entity_category: diagnostic
+  - platform: wifi_signal
+    name: WiFi ${devicename}
+    update_interval: 60s
+    entity_category: diagnostic
+  - platform: internal_temperature
+    name: Internal Temp. ${devicename}
+    entity_category: diagnostic
+    update_interval: 60s
+    
 binary_sensor:
  
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    name: "Constant Voltage"
-    id: "CVCC-CV"
+    name: "CV Constant Voltage"
+    id: "CVCC_CV"
     address: 17
     register_type: holding
     bitmask: 0x1
@@ -508,16 +601,18 @@ binary_sensor:
       
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    name: "Constant Current"
-    id: "CVCC-CC"
+    name: "CC Constant Current"
+    id: "CVCC_CC"
     address: 17
     register_type: holding
     bitmask: 0x1 
 
 number:
+
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    name: "Set output voltage"
+    name: "V_Set Set output voltage"
+    id: "V_SET"
     device_class: voltage
     unit_of_measurement: "V"
     entity_category: config
@@ -532,7 +627,8 @@ number:
   
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    name: "Set output current"
+    name: "I_SET Set output current"
+    id: "I_SET"
     device_class: current
     unit_of_measurement: "A"
     entity_category: config
@@ -544,135 +640,110 @@ number:
     step: ${${model}_current_multiplier}
     lambda: !lambda return x * ${${model}_current_multiplier};
     write_lambda: !lambda return x * (1/${${model}_current_multiplier});
-    
-  - platform: template
-    name: "Under current cutoff (battery charge)"
-    id: cutoff_current
-    device_class: current
-    unit_of_measurement: "A"
-    entity_category: config
-    mode: box
-    min_value: 0
-    max_value: ${${model}_current_maximum}
-    step: ${${model}_current_multiplier}
-    optimistic: true
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
     name: "Backlight"
-    id: "B-LED"
-    #device_class: current
-    unit_of_measurement: "(0-5)"
+    id: "B_LED"
     entity_category: config
     mode: slider
     address: 20
     value_type: U_WORD
-    min_value: 0
+    min_value: 1
     max_value: 5
     step: 1
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "SleepTime"
-    id: "SLEEP"
-    #device_class: current
-    unit_of_measurement: "min"
-    entity_category: config
-    mode: slider
-    address: 21
-    value_type: U_WORD
-    min_value: 0
-    max_value: 65535 #????
-    step: 1
+  # - platform: modbus_controller
+  #   modbus_controller_id: powersupply
+  #   name: "# SleepTime"
+  #   id: "SLEEP"
+  #   #device_class: current
+  #   unit_of_measurement: "min"
+  #   entity_category: config
+  #   mode: slider
+  #   address: 21
+  #   value_type: U_WORD
+  #   min_value: 0
+  #   max_value: 65535 #??? unclear max value
+  #   step: 1
+  # not working
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
     name: "Slave Address"
-    id: "SLAVE-ADD"
+    id: "SLAVE_ADD"
     device_class: data_rate
-    #unit_of_measurement: "min"
-    entity_category: config
+    entity_category: diagnostic
     mode: box
     address: 24
     value_type: U_WORD
     min_value: 0
-    max_value: 65535 #????
+    max_value: 65535 #??? unclear max value
     step: 1
 
+  # - platform: modbus_controller
+  #   modbus_controller_id: powersupply
+  #   name: "Internal Temperature Offset"
+  #   id: "T_IN_OFFSET"
+  #   entity_category: config
+  #   mode: box
+  #   address: 26
+  #   value_type: U_WORD
+  #   min_value: 0
+  #   max_value: 65535
+  #   step: 0.1
+  #   lambda: !lambda return x * 0.1;
+  #   write_lambda: !lambda return x * (1/0.1);
+  #not working
+
+  # - platform: modbus_controller
+  #   modbus_controller_id: powersupply
+  #   name: "External Temperature Offset"
+  #   id: "T_EX_OFFSET"
+  #   entity_category: config
+  #   mode: box
+  #   address: 27
+  #   value_type: U_WORD
+  #   min_value: 0
+  #   max_value: 6553.5
+  #   step: 0.1
+  #   lambda: !lambda return x * 0.1;
+  #   write_lambda: !lambda return x * (1/0.1);
+  #not working
+
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    name: "Baudrate"
-    id: "BAUDRATE_L"
-    #device_class: current
-    unit_of_measurement: "bps"
+    name: "MPPT Coefficient"
+    id: "MPPT_K"
+    address: 32
+    register_type: holding
     entity_category: config
     mode: box
-    address: 25
     value_type: U_WORD
-    min_value: 0
-    max_value: 8
-    #Note 1: (0019H) Baud rate register meaning 0:9600 1:14400 2:19200 3:38400 4:56000 5:576000 6:115200 (7:2400 8:4800 supported by some devices
-    step: 1
+    min_value: 0.75
+    max_value: 0.88
+    step: 0.01
+    lambda: !lambda return x * (1 * 0.01);
+    write_lambda: !lambda return x * 100;
+
+  # - platform: modbus_controller
+  #   modbus_controller_id: powersupply
+  #   name: "# Full Power cut-off Current???"
+  #   id: "BatFul"
+  #   device_class: current
+  #   unit_of_measurement: "A"
+  #   entity_category: config
+  #   mode: box
+  #   address: 33
+  #   value_type: U_WORD
+  #   #min_value: 0
+  #   #max_value: ${${model}_power_maximum}
+  #   step: 0.01
+  # not working
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    name: "Internal Temperature Offset"
-    id: "T-IN-OFFSET"
-    entity_category: config
-    mode: box
-    address: 26
-    value_type: U_WORD
-    min_value: 0
-    max_value: 65535
-    step: 0.1
-    lambda: !lambda return x * 0.1;
-    write_lambda: !lambda return x * (1/0.1);
-
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "External Temperature Offset"
-    id: "T-EX-OFFSET"
-    entity_category: config
-    mode: box
-    address: 27
-    value_type: U_WORD
-    min_value: 0
-    max_value: 6553.5
-    step: 0.1
-    lambda: !lambda return x * 0.1;
-    write_lambda: !lambda return x * (1/0.1);
-
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Quick Recall Data Groups"
-    id: "EXTRACT-M"
-    #device_class: current
-    #unit_of_measurement: "bps"
-    entity_category: config
-    mode: slider
-    address: 29
-    value_type: U_WORD
-    min_value: 0
-    max_value: 9 #????
-    step: 1
-
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Full Power cut-off Current???"
-    id: "BatFul"
-    device_class: current
-    unit_of_measurement: "A"
-    entity_category: config
-    mode: box
-    address: 33
-    value_type: U_WORD
-    min_value: 0
-    max_value: ${${model}_current_maximum}
-    step: 1
-
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Constant Power Value"
+    name: "CW Constant Power Value"
     id: "CW"
     device_class: current
     unit_of_measurement: "W"
@@ -682,213 +753,375 @@ number:
     value_type: U_WORD
     min_value: 0
     max_value: ${${model}_power_maximum}
-    step: 1
+    step: 0.1
+    lambda: !lambda return x * 0.1;
+    write_lambda: !lambda return x * 10;
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    name: "Voltage Setting"
-    id: "V-SET-2"
-    device_class: voltage
+    name: "BCH Battery Voltage Threshold"
+    id: "bch_threshold"
+    address: 42
+    register_type: holding
+    value_type: U_WORD
     unit_of_measurement: "V"
+    device_class: voltage
     entity_category: config
     mode: box
-    address: 80
-    value_type: U_WORD
     min_value: 0
     max_value: ${${model}_voltage_maximum}
     step: ${${model}_voltage_multiplier}
-    lambda: !lambda return x * ${${model}_voltage_multiplier};
-    write_lambda: !lambda return x * (1/${${model}_voltage_multiplier});
+    lambda: !lambda return x * 0.01f;
+    write_lambda: !lambda return x * 100.0f;
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    name: "Current Setting"
-    id: "I-SET-2"
-    device_class: current
+    name: "BTF Battery Cutoff Current"
+    id: "btf_cutoff"
+    address: 44
+    register_type: holding
+    value_type: U_WORD
     unit_of_measurement: "A"
+    device_class: current
     entity_category: config
     mode: box
-    address: 81
-    value_type: U_WORD
     min_value: 0
     max_value: ${${model}_current_maximum}
     step: ${${model}_current_multiplier}
-    lambda: !lambda return x * ${${model}_current_multiplier};
-    write_lambda: !lambda return x * (1/${${model}_current_multiplier});
+    lambda: !lambda return x * 0.001f;
+    write_lambda: !lambda return x * 1000.0f;
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Input Undervoltage Protection"
-    id: "S-LVP"
-    device_class: voltage
+  - platform: template
+    name: "M V_SET_2 Voltage Setting"
+    id: "V_SET_2"
     unit_of_measurement: "V"
-    entity_category: config
-    mode: box
-    address: 82
-    value_type: U_WORD
-    min_value: 10
-    max_value: 75
-    step: ${${model}_voltage_multiplier}
-    lambda: !lambda return x * ${${model}_voltage_multiplier};
-    write_lambda: !lambda return x * (1/${${model}_voltage_multiplier});
-
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Over Voltage Protection"
-    id: "S-OVP"
     device_class: voltage
-    unit_of_measurement: "V"
-    entity_category: config
-    mode: box
-    address: 83
-    value_type: U_WORD
     min_value: 0
-    max_value: 67
+    max_value: ${${model}_voltage_maximum}
     step: ${${model}_voltage_multiplier}
-    lambda: !lambda return x * ${${model}_voltage_multiplier};
-    write_lambda: !lambda return x * (1/${${model}_voltage_multiplier});
-    
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Overcurrent Protection"
-    id: "S-OCP"
-    device_class: current
+    optimistic: true
+    set_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010 + 0; // V-SET :contentReference[oaicite:10]{index=10}
+          uint16_t raw = (uint16_t) (x * 100.0f + 0.5f);
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(ctl, addr, raw);
+          ctl->queue_command(cmd);
+      - script.execute: mem_refresh_group
+
+  - platform: template
+    name: "M I_SET_2 Current Setting"
+    id: "I_SET_2"
     unit_of_measurement: "A"
-    entity_category: config
-    mode: box
-    address: 84
-    value_type: U_WORD
+    device_class: current
     min_value: 0
-    max_value: 9.2
+    max_value: ${${model}_current_maximum}
     step: ${${model}_current_multiplier}
-    lambda: !lambda return x * ${${model}_current_multiplier};
-    write_lambda: !lambda return x * (1/${${model}_current_multiplier});
+    optimistic: true
+    set_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010 + 1; // I-SET :contentReference[oaicite:11]{index=11}
+          uint16_t raw = (uint16_t) (x * 1000.0f + 0.5f);
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(ctl, addr, raw);
+          ctl->queue_command(cmd);
+      - script.execute: mem_refresh_group
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Overpower Protection"
-    id: "S-OPP"
-    device_class: power
-    unit_of_measurement: "W"
-    entity_category: config
-    mode: box
-    address: 85
-    value_type: U_WORD
+  - platform: template
+    name: "S_LVP Input Undervoltage Protection"
+    id: "S_LVP"
+    unit_of_measurement: "V"
+    device_class: voltage
+    min_value: ${${model}_slvp_l}
+    max_value: ${${model}_slvp_h}
+    step: ${${model}_voltage_multiplier}
+    optimistic: true
+    set_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010 + 2; // S-LVP :contentReference[oaicite:12]{index=12}
+          uint16_t raw = (uint16_t) (x * 100.0f + 0.5f);
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(ctl, addr, raw);
+          ctl->queue_command(cmd);
+      - script.execute: mem_refresh_group
+
+  - platform: template
+    name: "S_OVP Over Voltage Protection"
+    id: "S_OVP"
+    unit_of_measurement: "V"
+    device_class: voltage
     min_value: 0
-    max_value: 650
-    step: 0.1
-    lambda: !lambda return x * 0.1;
-    write_lambda: !lambda return x * (1/0.1);
+    max_value: ${${model}_sovp}
+    step: ${${model}_voltage_multiplier}
+    optimistic: true
+    set_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010 + 3; // S-OVP :contentReference[oaicite:13]{index=13}
+          uint16_t raw = (uint16_t) (x * 100.0f + 0.5f);
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(ctl, addr, raw);
+          ctl->queue_command(cmd);
+      - script.execute: mem_refresh_group
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
+  - platform: template
+    name: "S_OCP Overcurrent Protection"
+    id: "S_OCP"
+    unit_of_measurement: "A"
+    device_class: current
+    min_value: 0
+    max_value: ${${model}_socp}
+    step: ${${model}_current_multiplier}
+    optimistic: true
+    set_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010 + 4; // S-OCP :contentReference[oaicite:14]{index=14}
+          uint16_t raw = (uint16_t) (x * 1000.0f + 0.5f);
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(ctl, addr, raw);
+          ctl->queue_command(cmd);
+      - script.execute: mem_refresh_group
+
+  - platform: template
+    name: "S_OPP Overpower Protection"
+    id: "S_OPP"
+    unit_of_measurement: "W"
+    device_class: power
+    min_value: 0
+    max_value: ${${model}_sopp}
+    step: ${${model}_power_multiplier}
+    optimistic: true
+    set_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010 + 5; // S-OPP :contentReference[oaicite:15]{index=15}
+          uint16_t raw = (uint16_t) (x * 10.0f + 0.5f);
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(ctl, addr, raw);
+          ctl->queue_command(cmd);
+      - script.execute: mem_refresh_group
+
+  - platform: template
     name: "Maximum Output Duration Hours"
-    id: "S-OHP_H"
+    id: "S_OHP_H"
     unit_of_measurement: "h"
-    entity_category: config
-    mode: box
-    address: 86
-    value_type: U_WORD
     min_value: 0
     max_value: 99
     step: 1
+    optimistic: true
+    internal: true
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Maximum Output Duration Minutes"
-    id: "S-OHP_M"
-    unit_of_measurement: "m"
-    entity_category: config
-    mode: box
-    address: 87
-    value_type: U_WORD
+  - platform: template
+    name: "Maximum Output Duration Minutes (M S-OHP-M)"
+    id: "S_OHP_M"
+    unit_of_measurement: "min"
     min_value: 0
     max_value: 59
     step: 1
+    optimistic: true
+    internal: true
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Maximum Capacity low 16 bit"
-    id: "S-OHA_L"
+  - platform: template
+    name: "S_OHP Maximum Output Duration"
+    id: "S_OHP"
+    unit_of_measurement: "min"
+    min_value: 0
+    max_value: 5999   # 99*60 + 59
+    step: 1
+    #optimistic: true
+    lambda: |-
+      // show current value as total minutes
+      int h = (int) id(S_OHP_H).state;
+      int m = (int) id(S_OHP_M).state;
+      if (h < 0) h = 0;
+      if (m < 0) m = 0;
+      return (float) (h * 60 + m);
+    set_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t base = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010; // group base
+          const uint16_t addr_h = base + 6; // S-OHP-H
+          const uint16_t addr_m = base + 7; // S-OHP-M
+
+          int total = (int) (x + 0.5f);
+          if (total < 0) total = 0;
+          if (total > 5999) total = 5999;
+
+          uint16_t h = (uint16_t) (total / 60);
+          uint16_t m = (uint16_t) (total % 60);
+
+          // write both regs in one FC16 (more reliable than two separate writes)
+          std::vector<uint16_t> payload = { h, m };
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_multiple_command(
+              ctl, addr_h, 2, payload);
+          ctl->queue_command(cmd);
+
+          // update internal shadow values immediately (nice UX) + refresh from device
+          id(S_OHP_H).publish_state(h);
+          id(S_OHP_M).publish_state(m);
+      - script.execute: mem_refresh_group
+
+  - platform: template
+    name: "S_OHA Maximum Capacity"
+    id: "S_OHA"
     unit_of_measurement: "Ah"
-    entity_category: config
     device_class: current
-    mode: box
-    address: 89
-    value_type: U_WORD
     min_value: 0
-    #max_value: 99
-    step: 1
+    max_value: 9.999
+    step: ${${model}_current_multiplier}
+    #optimistic: true
+    set_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010 + 8; // S-OAH_L
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Maximum Capacity high 16 bit"
-    id: "S-OHA_H"
-    unit_of_measurement: "Ah"
-    entity_category: config
-    device_class: current
-    mode: box
-    address: 90
-    value_type: U_WORD
-    min_value: 0
-    #max_value: 99
-    step: 1
+          // Convert Ah -> milli-Ah units (0.001 Ah steps) before packing to uint32
+          float ah = x;
+          if (ah < 0) ah = 0;
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Maximum Power low 16 bit"
-    id: "S-OWH_L"
+          uint32_t v = (uint32_t) lroundf(ah * 1000.0f);
+
+          std::vector<uint16_t> payload = {
+            (uint16_t)(v & 0xFFFF),
+            (uint16_t)((v >> 16) & 0xFFFF)
+          };
+
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_multiple_command(ctl, addr, 2, payload);
+          ctl->queue_command(cmd);
+
+          // Optional: immediately update the backing value if you use mem_s_oah as Ah
+          id(S_OHA).publish_state(ah);
+      - script.execute: mem_refresh_group
+
+  - platform: template
+    name: "S_OWH Maximum Power"
+    id: "S_OWH"
     unit_of_measurement: "Wh"
-    entity_category: config
     device_class: power
-    mode: box
-    address: 90
-    value_type: U_WORD
     min_value: 0
-    #max_value: 99
-    step: 1
+    max_value: 99.99
+    step: ${${model}_power_multiplier}
+    optimistic: true
+    set_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010 + 10; // S-OWH_L :contentReference[oaicite:17]{index=17}
+          uint32_t v = (uint32_t) (x * 100.0f + 0.5f); // 0.01 Wh steps
+          std::vector<uint16_t> payload = { (uint16_t)(v & 0xFFFF), (uint16_t)((v >> 16) & 0xFFFF) };
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_multiple_command(ctl, addr, 2, payload);
+          ctl->queue_command(cmd);
+      - script.execute: mem_refresh_group
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Maximum Power high 16 bit"
-    id: "S-OWH_H"
-    unit_of_measurement: "Wh"
-    entity_category: config
-    device_class: power
-    mode: box
-    address: 91
-    value_type: U_WORD
-    min_value: 0
-    #max_value: 99
-    step: 1
-
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Maximum Internal Temperature"
-    id: "S-OTP"
+  - platform: template
+    name: "S_OTP Maximum Internal Temperature"
+    id: "S_OTP"
     unit_of_measurement: "°C"
-    entity_category: config
     device_class: temperature
     mode: box
-    address: 92
-    value_type: U_WORD
     min_value: 0
     max_value: 110
     step: 1
+    optimistic: true
+    set_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010 + 12; // S-OTP :contentReference[oaicite:18]{index=18}
+          uint16_t raw = (uint16_t) (x + 0.5f);
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(ctl, addr, raw);
+          ctl->queue_command(cmd);
+      - script.execute: mem_refresh_group
 
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Maximum External Temperature"
-    id: "S-ETP"
+  - platform: template
+    name: "S_ETP Maximum External Temperature"
+    id: "S_ETP"
     unit_of_measurement: "°C"
-    entity_category: config
     device_class: temperature
     mode: box
-    address: 94
-    value_type: U_WORD
     min_value: 0
     max_value: 110
     step: 1
+    optimistic: true
+    set_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010 + 14; // S-ETP :contentReference[oaicite:19]{index=19}
+          uint16_t raw = (uint16_t) (x + 0.5f);
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(ctl, addr, raw);
+          ctl->queue_command(cmd);
+      - script.execute: mem_refresh_group
+
+select:
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Temperature Symbol"
+    id: "FC"
+    address: 19
+    value_type: U_WORD
+    entity_category: diagnostic
+    optionsmap:
+      "C": 0
+      "F": 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Baudrate select"
+    id: "BAUDRATE_L"
+    entity_category: diagnostic
+    address: 25
+    value_type: U_WORD
+    optionsmap:
+      "9600": 0
+      "14400": 1
+      "19200": 2
+      "38400": 3
+      "56000": 4
+      "576000": 5
+      "115200": 6
+      "2400": 7
+      "4800": 8
+    #(0019H) Baud rate register meaning 0:9600 1:14400 2:19200 3:38400 4:56000 5:576000 6:115200 (7:2400 8:4800 supported by some devices
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Quick Recall Data Groups"
+    id: "EXTRACT_M"
+    entity_category: config
+    address: 29
+    value_type: U_WORD
+    optionsmap:
+      "M0": 0
+      "M1": 1
+      "M2": 2
+      "M3": 3
+      "M4": 4
+      "M5": 5
+      "M6": 6
+      "M7": 7
+      "M8": 8
+      "M9": 9
+
+  - platform: template
+    name: "Memory group to edit"
+    id: mem_group_select
+    options:
+      - "M0"
+      - "M1"
+      - "M2"
+      - "M3"
+      - "M4"
+      - "M5"
+      - "M6"
+      - "M7"
+      - "M8"
+      - "M9"
+    optimistic: true
+    initial_option: "M0"
+    set_action:
+      - lambda: |-
+          // x is the selected option string (e.g. "M3")
+          if (x.size() >= 2 && x[0] == 'M') {
+            id(mem_edit_group) = atoi(x.c_str() + 1);
+          }
+      - script.execute: mem_refresh_group
 
 switch:
 
@@ -903,18 +1136,9 @@ switch:
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    name: "Output"
+    name: "Output On/Off"
     id: "ONOFF"
     address: 18
-    register_type: holding
-    bitmask: 0x1
-    entity_category: config
-    
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Temperature Symbol (on=F/off=C)"
-    id: "FC"
-    address: 19
     register_type: holding
     bitmask: 0x1
     entity_category: config
@@ -930,55 +1154,94 @@ switch:
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    name: "Device Status"
-    id: "DEVICE"
-    address: 30
-    register_type: holding
-    bitmask: 0x1
-    entity_category: config
-
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
     name: "MPPT Switch"
-    id: "MPPT-SW"
+    id: "MPPT_SW"
     address: 31
     register_type: holding
     bitmask: 0x1
     entity_category: config
-    inverted: true
-
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "MPPT Coefficient"
-    id: "MPPT-K"
-    address: 32
-    register_type: holding
-    bitmask: 0x1
-    entity_category: config
+    inverted: False
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
     name: "Constant Power Switch"
-    id: "CW-SW"
+    id: "CW_SW"
     address: 34
     register_type: holding
     bitmask: 0x1
     entity_category: config
-    inverted: true
+    inverted: false
+
+  - platform: template
+    name: "S_INI Power after boot"
+    id: "S_INI"
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010 + 13; // S-INI :contentReference[oaicite:20]{index=20}
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(ctl, addr, 1);
+          ctl->queue_command(cmd);
+      - script.execute: mem_refresh_group
+    turn_off_action:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 0x0050 + (uint16_t) id(mem_edit_group) * 0x0010 + 13; // S-INI :contentReference[oaicite:21]{index=21}
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(ctl, addr, 0);
+          ctl->queue_command(cmd);
+      - script.execute: mem_refresh_group
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
-    name: "Power Output Switch"
-    id: "S-INI"
-    address: 93
+    name: "BCH Enable"
+    id: "bch_enable"
+    address: 41
     register_type: holding
-    bitmask: 0x1
+    bitmask: 0x0001
     entity_category: config
-    inverted: true
-   
-  - platform: gpio
-    id: out_relay
-    name: "Output relay"
-    pin:
-      number: GPIO4
-      inverted: false
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "BTF Enable"
+    id: "btf_enable"
+    address: 43
+    register_type: holding
+    bitmask: 0x0001
+    entity_category: config
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "CLOF Output off on group change"
+    id: "clof_enable"
+    address: 45
+    register_type: holding
+    bitmask: 0x0001
+    entity_category: config
+
+button:
+
+  - platform: template
+    name: "Recall edited group on device"
+    id: "recall"
+    on_press:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(
+              ctl, 0x001D, (uint16_t) id(mem_edit_group));  // EXTRACT-M :contentReference[oaicite:23]{index=23}
+          ctl->queue_command(cmd);
+
+  - platform: template
+    name: "PSU Reset"
+    id: "DEVICE"
+    entity_category: config
+    on_press:
+      - lambda: |-
+          auto *ctl = id(powersupply);
+          const uint16_t addr = 30; // DEVICE / reset command register
+          // set bit (write whole register to 1)
+          auto cmd1 = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(ctl, addr, 1);
+          ctl->queue_command(cmd1);
+
+  - platform: restart
+    name: Restart ${devicename}
+    entity_category: diagnostic
