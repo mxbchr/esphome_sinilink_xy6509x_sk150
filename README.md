@@ -10,7 +10,7 @@ This project brings Sinilink / bench power supplies to ESPHome (and therefore Ho
 
 ## Hardware wiring
 
-Connect the PSU UART header directly to your ESP (I used an ESP32-C3):
+Connect the PSU UART directly to your ESP (I used an ESP32-C3):
 
 * **5V** from the PSU → ESP 5V (or VIN, depending on board)
 * **GND** → ESP GND
@@ -57,6 +57,8 @@ After pairing the device with Home Assistant via the ESPHome integration, you’
 
 * Select which memory group you want to edit using **“Memory group to edit”** (M0…M9)
 * Change memory-group-specific setpoints and limits (V/I set, protection values, timers, etc.)
+
+Update interval is set to **1s** for all PSU entities. This works fine. Everything below delivered mixed results.
 
 ## Credits / origin
 
